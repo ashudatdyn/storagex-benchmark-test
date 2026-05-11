@@ -3,25 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StorageX & Elasticsearch Performance Benchmark Plan</title>
+    <title>Enterprise Storage Analytics</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Tailwind Config for Custom Colors -->
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
-                        slate: {
-                            850: '#1e293b',
-                            900: '#0f172a',
-                        },
                         brand: {
-                            blue: '#3b82f6',
-                            teal: '#14b8a6',
-                            indigo: '#6366f1'
+                            50: '#f0fdfa',
+                            100: '#ccfbf1',
+                            500: '#14b8a6',
+                            600: '#0d9488',
+                            900: '#134e4a',
                         }
                     }
                 }
@@ -29,729 +28,773 @@
         }
     </script>
     <style>
-        /* Chart Container Styling - Mandatory Requirements */
-        .chart-container {
-            position: relative;
-            width: 100%;
-            max-width: 100%; /* Adapts to column width */
-            margin-left: auto;
-            margin-right: auto;
-            height: 300px;
-            max-height: 400px;
-        }
-        @media (min-width: 768px) {
-            .chart-container {
-                height: 350px;
-            }
-        }
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background-color: #f8fafc; }
+        .glass-card { background: white; border: 1px solid #e2e8f0; border-radius: 0.75rem; box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1); }
+        .metric-value { font-variant-numeric: tabular-nums; }
+        .hidden-view { display: none !important; }
         
-        /* Custom Scrollbar for list views */
-        .custom-scroll::-webkit-scrollbar {
-            width: 8px;
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
         }
-        .custom-scroll::-webkit-scrollbar-track {
-            background: #f1f5f9;
-        }
-        .custom-scroll::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 4px;
-        }
-        .custom-scroll::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
-        }
-
-        .active-row {
-            background-color: #eff6ff; /* blue-50 */
-            border-left: 4px solid #3b82f6; /* blue-500 */
-        }
+        .animate-fadeIn { animation: fadeIn 0.3s ease-out forwards; }
     </style>
-    <!-- Chosen Palette: Slate (Backgrounds), Blue/Teal/Indigo (Accents) - Professional, Technical, Clean -->
-    <!-- Application Structure Plan: 
-        1. **Executive Summary Dashboard:** Top-level metrics (Total files, data volume) to give immediate scope context.
-        2. **Interactive Test Matrix:** The core workspace. A split-pane view with a filterable list of Test Cases on the left and a detailed "Data Card" on the right. This allows users to browse the plan without being overwhelmed by a giant table.
-        3. **Performance Forecast:** A dedicated section with visualizations comparing the 'Expected Baseline' performance metrics across test cases, helping identify which tests are expected to be bottlenecks.
-        4. **Technical Specifications:** A tabbed or accordion section for the deep technical details (Queries, Generation Strategy) that are needed during execution but not for high-level planning.
-        Reasoning: The report is a dense technical plan. The SPA unpacks this into "Planning" (Dashboard), "Execution" (Matrix), and "Analysis" (Forecast) phases for better usability.
-    -->
-    <!-- Visualization & Content Choices:
-        1. **Goal: Inform (Scope):** Summary Cards. Simple text/number display.
-        2. **Goal: Compare (Performance):** Bar Chart (Grouped). Compares Crawl vs Index rates per Test Case. Chart.js used.
-        3. **Goal: Organize (Test Cases):** Interactive List + Detail View. Replaces the static table. JS filtering handles categories.
-        4. **Goal: Inform (Constraints):** Doughnut Chart. Visualizes the 40/40/20 file size distribution rule.
-        5. **Goal: Inform (Validation):** Pre-formatted code blocks for KQL/Aggregations.
-        CONFIRMATION: NO SVG graphics used. NO Mermaid JS used.
-    -->
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans leading-normal">
+<body class="text-slate-800">
 
-    <!-- Navigation / Header -->
-    <nav class="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0 flex items-center gap-2">
-                        <span class="text-2xl text-blue-600 font-bold">⚡</span>
-                        <h1 class="text-xl font-bold text-slate-900 tracking-tight">StorageX Scan test benchmarks <span class="text-slate-400 font-normal">| StorageX & Elasticsearch 8.x</span></h1>
+    <!-- Top Navigation -->
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-50">
+        <div class="max-w-[90rem] mx-auto px-4 md:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center gap-2">
+                    <div class="bg-brand-600 p-1.5 rounded-lg">
+                        <i data-lucide="layers" class="w-5 h-5 text-white"></i>
                     </div>
+                    <span class="text-xl font-bold text-slate-900 tracking-tight">BNY | SXA QA</span>
                 </div>
-                <div class="flex items-center space-x-4">
-                    <span class="text-sm text-slate-500 bg-slate-100 px-3 py-1 rounded-full">v1.0 Release</span>
+                <div class="flex h-full">
+                    <button class="nav-tab h-full px-6 border-b-2 font-medium text-sm transition-colors text-brand-600 border-brand-600" data-target="view-scans" onclick="switchView('view-scans')">
+                        Scan Status
+                    </button>
+                    <button class="nav-tab h-full px-6 border-b-2 font-medium text-sm transition-colors text-slate-500 border-transparent hover:text-slate-700 hover:border-slate-300" data-target="view-archives" onclick="switchView('view-archives')">
+                        Archival Status
+                    </button>
+                </div>
+                <div class="flex gap-3">
+                    <button class="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors" title="Export Dashboard" onclick="exportToCSV()">
+                        <i data-lucide="download" class="w-5 h-5"></i>
+                    </button>
+                    <button class="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors" title="Refresh Data" onclick="location.reload()">
+                        <i data-lucide="refresh-cw" class="w-5 h-5"></i>
+                    </button>
                 </div>
             </div>
         </div>
     </nav>
 
-    <!-- Main Content Wrapper -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <main class="max-w-[90rem] mx-auto p-4 md:p-8">
 
-        <!-- Section 1: Executive Summary -->
-        <section class="animate-fade-in-up">
-            <div class="mb-4">
-                <h2 class="text-2xl font-bold text-slate-900">Benchmark Scope Overview</h2>
-                <p class="text-slate-600 mt-1">
-                    High-level summary of the dataset generation requirements and target objectives. This plan is designed to validate StorageX crawling efficiency and Elasticsearch 8.x indexing throughput under enterprise conditions.
-                </p>
+        <!-- ==========================================
+             VIEW 1: SCAN ANALYTICS
+             ========================================== -->
+        <div id="view-scans" class="view-section space-y-6 animate-fadeIn">
+            
+            <header class="mb-2">
+                <h1 class="text-2xl font-bold text-slate-900">Scan Performance & Volume Metrics</h1>
+                <p class="text-slate-500 mt-1"> May 2026 </p>
+            </header>
+
+            <!-- Top KPIs -->
+            <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                <div class="glass-card p-5 relative overflow-hidden">
+                    <div class="flex justify-between items-start mb-2">
+                        <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wider">Total Data</h3>
+                        <div class="p-2 bg-blue-50 rounded-lg"><i data-lucide="hard-drive" class="w-5 h-5 text-blue-600"></i></div>
+                    </div>
+                    <div class="metric-value text-3xl font-bold text-slate-900" id="kpiTotalData">- <span class="text-lg text-slate-500 font-normal">TB</span></div>
+                    <div class="mt-2 text-sm text-slate-500">Across all jobs (Base 10)</div>
+                    <div class="absolute -bottom-4 -right-4 text-slate-50 opacity-50"><i data-lucide="hard-drive" class="w-24 h-24"></i></div>
+                </div>
+
+                <div class="glass-card p-5 relative overflow-hidden">
+                    <div class="flex justify-between items-start mb-2">
+                        <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wider">Total Objects</h3>
+                        <div class="p-2 bg-purple-50 rounded-lg"><i data-lucide="files" class="w-5 h-5 text-purple-600"></i></div>
+                    </div>
+                    <div class="metric-value text-3xl font-bold text-slate-900" id="kpiTotalObjects">- <span class="text-lg text-slate-500 font-normal">M</span></div>
+                    <div class="mt-2 text-sm text-slate-500">Files & Folders</div>
+                    <div class="absolute -bottom-4 -right-4 text-slate-50 opacity-50"><i data-lucide="files" class="w-24 h-24"></i></div>
+                </div>
+
+                <div class="glass-card p-5 relative overflow-hidden ring-2 ring-brand-500 bg-brand-50/30">
+                    <div class="flex justify-between items-start mb-2">
+                        <h3 class="text-sm font-semibold text-brand-800 uppercase tracking-wider">System Throughput</h3>
+                        <div class="p-2 bg-brand-100 rounded-lg"><i data-lucide="gauge" class="w-5 h-5 text-brand-600"></i></div>
+                    </div>
+                    <div class="metric-value text-3xl font-bold text-brand-700" id="kpiSystemThroughput">- <span class="text-lg text-brand-500 font-normal">TB/hr</span></div>
+                    <div class="mt-2 text-sm text-brand-600 font-medium">True concurrent ingestion</div>
+                    <div class="absolute -bottom-4 -right-4 text-brand-100 opacity-50"><i data-lucide="gauge" class="w-24 h-24"></i></div>
+                </div>
+
+                <div class="glass-card p-5 relative overflow-hidden">
+                    <div class="flex justify-between items-start mb-2">
+                        <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wider">Peak Job Throughput</h3>
+                        <div class="p-2 bg-orange-50 rounded-lg"><i data-lucide="zap" class="w-5 h-5 text-orange-600"></i></div>
+                    </div>
+                    <div class="metric-value text-3xl font-bold text-slate-900" id="kpiPeakThroughput">- <span class="text-lg text-slate-500 font-normal">TB/hr</span></div>
+                    <div class="mt-2 text-sm text-slate-500 truncate" id="kpiPeakJob">Single fastest job</div>
+                    <div class="absolute -bottom-4 -right-4 text-slate-50 opacity-50"><i data-lucide="zap" class="w-24 h-24"></i></div>
+                </div>
+
+                <div class="glass-card p-5 relative overflow-hidden">
+                    <div class="flex justify-between items-start mb-2">
+                        <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wider">Job Status</h3>
+                        <div class="p-2 bg-slate-100 rounded-lg"><i data-lucide="activity" class="w-5 h-5 text-slate-600"></i></div>
+                    </div>
+                    <div class="flex items-end gap-3 mt-1">
+                        <div class="metric-value text-3xl font-bold text-slate-900" id="kpiTotalJobs">-</div>
+                        <div class="text-sm text-slate-500 mb-1">Total</div>
+                    </div>
+                    <div class="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm font-medium" id="kpiJobBreakdown"></div>
+                </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                <!-- KPI Card 1 -->
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between hover:shadow-md transition-shadow">
-                    <div>
-                        <p class="text-sm font-medium text-slate-500 uppercase tracking-wider">Total Test Cases</p>
-                        <p class="text-3xl font-bold text-slate-900 mt-2" id="total-tc">15</p>
+            <!-- Performance Insights -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="glass-card p-5">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold text-slate-800 flex items-center gap-2"><i data-lucide="trending-up" class="w-5 h-5 text-green-500"></i> Top Performing Jobs</h3>
                     </div>
-                    <div class="mt-4 flex items-center text-sm text-blue-600">
-                        <span>Functional & Stress Scenarios</span>
-                    </div>
+                    <div id="topJobsList" class="space-y-3"></div>
                 </div>
-                <!-- KPI Card 2 -->
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between hover:shadow-md transition-shadow">
-                    <div>
-                        <p class="text-sm font-medium text-slate-500 uppercase tracking-wider">Total Files to Gen</p>
-                        <p class="text-3xl font-bold text-slate-900 mt-2" id="total-files">9.2M</p>
+                <div class="glass-card p-5">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold text-slate-800 flex items-center gap-2"><i data-lucide="trending-down" class="w-5 h-5 text-red-500"></i> Performance Bottlenecks</h3>
+                        <span class="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded border border-slate-200">Likely small file issues</span>
                     </div>
-                    <div class="mt-4 flex items-center text-sm text-teal-600">
-                        <span>Across all profiles</span>
-                    </div>
-                </div>
-                <!-- KPI Card 3 -->
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col justify-between hover:shadow-md transition-shadow">
-                    <div>
-                        <p class="text-sm font-medium text-slate-500 uppercase tracking-wider">Total Data Volume</p>
-                        <p class="text-3xl font-bold text-slate-900 mt-2" id="total-volume">~50 TB</p>
-                    </div>
-                    <div class="mt-4 flex items-center text-sm text-indigo-600">
-                        <span>Max File Size: 1 GB</span>
-                    </div>
-                </div>
-                <!-- KPI Card 4: Chart -->
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col items-center justify-center">
-                    <p class="text-xs font-medium text-slate-500 uppercase mb-2 w-full text-left">Distribution Constraint</p>
-                    <div class="h-24 w-full flex justify-center">
-                        <div class="chart-container" style="height: 100px; max-height: 100px;">
-                            <canvas id="distChart"></canvas>
-                        </div>
-                    </div>
+                    <div id="bottomJobsList" class="space-y-3"></div>
                 </div>
             </div>
-        </section>
 
-        <!-- Section 2: Interactive Test Matrix -->
-        <section class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <div class="p-6 border-b border-slate-200 bg-slate-50/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <!-- Charts Section -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="glass-card p-5 lg:col-span-2">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-lg font-semibold text-slate-800">Daily Scan Volume (TB)</h2>
+                    </div>
+                    <div class="h-[300px] w-full"><canvas id="volumeChart"></canvas></div>
+                </div>
+                <div class="glass-card p-5">
+                    <h2 class="text-lg font-semibold text-slate-800 mb-4">Daily Objects & Processing Speed</h2>
+                    <div class="h-[250px] w-full relative"><canvas id="objectsChart"></canvas></div>
+                    <div class="mt-4 text-sm text-slate-600 text-center">Total objects (bars) vs. System processing speed (line)</div>
+                </div>
+            </div>
+
+            <!-- Jobs Data Table -->
+            <div class="glass-card overflow-hidden">
+                <div class="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+                    <h2 class="text-lg font-semibold text-slate-800">Complete Job Listing</h2>
+                    <div class="relative">
+                        <i data-lucide="search" class="w-4 h-4 absolute left-3 top-2.5 text-slate-400"></i>
+                        <input type="text" placeholder="Search jobs..." class="pl-9 pr-4 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 w-64">
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse" id="jobsTable">
+                        <thead>
+                            <tr class="bg-white text-slate-500 text-xs uppercase tracking-wider border-b border-slate-200">
+                                <th class="p-4 font-semibold hover:bg-slate-50 group transition-colors">
+                                    <div class="flex items-center justify-between">
+                                        <div class="cursor-pointer flex-1" onclick="sortTable(0)">
+                                            Scan Name <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1"></i>
+                                        </div>
+                                        <div class="flex gap-1 bg-white border border-slate-200 rounded px-1 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button onclick="adjustColWidth(-50, event)" class="hover:text-brand-600 p-0.5" title="Decrease Column Width"><i data-lucide="minus" class="w-3 h-3"></i></button>
+                                            <button onclick="adjustColWidth(50, event)" class="hover:text-brand-600 p-0.5" title="Increase Column Width"><i data-lucide="plus" class="w-3 h-3"></i></button>
+                                        </div>
+                                    </div>
+                                </th>
+                                <th class="p-4 font-semibold cursor-pointer hover:bg-slate-50" onclick="sortTable(1)">State <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1"></i></th>
+                                <th class="p-4 font-semibold cursor-pointer hover:bg-slate-50" onclick="sortTable(2)">Start Time <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1"></i></th>
+                                <th class="p-4 font-semibold cursor-pointer hover:bg-slate-50 text-right" onclick="sortTable(3)">Total Files <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1"></i></th>
+                                <th class="p-4 font-semibold cursor-pointer hover:bg-slate-50 text-right" onclick="sortTable(4)">Data Scanned <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1"></i></th>
+                                <th class="p-4 font-semibold cursor-pointer hover:bg-slate-50 text-right" onclick="sortTable(5)">Avg File Size <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1"></i></th>
+                                <th class="p-4 font-semibold cursor-pointer hover:bg-slate-50 text-right" onclick="sortTable(6)">Throughput <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1"></i></th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-sm divide-y divide-slate-100" id="tableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==========================================
+             VIEW 2: ARCHIVAL STATUS
+             ========================================== -->
+        <div id="view-archives" class="view-section hidden-view space-y-6 animate-fadeIn">
+            
+            <header class="mb-2 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h2 class="text-xl font-bold text-slate-900">Test Execution Matrix</h2>
-                    <p class="text-sm text-slate-600">Select a test case to view detailed requirements, metrics, and generation strategies.</p>
-                </div>
-                <div class="flex space-x-2">
-                    <button onclick="filterTests('all')" class="filter-btn active px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" data-filter="all">All Tests</button>
-                    <button onclick="filterTests('Functional Baseline')" class="filter-btn px-4 py-2 text-sm font-medium rounded-lg bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" data-filter="Functional Baseline">Functional</button>
-                    <button onclick="filterTests('Scale & Stress')" class="filter-btn px-4 py-2 text-sm font-medium rounded-lg bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" data-filter="Scale & Stress">Scale</button>
-                    <button onclick="filterTests('Metadata Stress')" class="filter-btn px-4 py-2 text-sm font-medium rounded-lg bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" data-filter="Metadata Stress">Stress</button>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-3 h-[600px]">
-                <!-- Left Column: Test Case List -->
-                <div class="col-span-1 border-r border-slate-200 overflow-y-auto custom-scroll bg-white">
-                    <div id="tc-list" class="divide-y divide-slate-100">
-                        <!-- Content populated by JS -->
+                    <div class="flex items-center gap-3">
+                        <h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                            <i data-lucide="archive" class="w-6 h-6 text-brand-600"></i>
+                            Archival Job Detail
+                        </h1>
+                        <span class="px-3 py-1 bg-red-100 text-red-800 border border-red-200 rounded-full text-xs font-semibold flex items-center gap-1 uppercase tracking-wide">
+                            <i data-lucide="alert-triangle" class="w-3 h-3"></i> Completed With Errors
+                        </span>
                     </div>
+                    <p class="text-slate-500 mt-1 font-mono text-sm">archive_CDOTTPC30_t30s30v49_wfp_v3</p>
                 </div>
+            </header>
 
-                <!-- Right Column: Detail View -->
-                <div class="col-span-1 lg:col-span-2 overflow-y-auto custom-scroll bg-slate-50/30 p-6 md:p-8">
-                    <div id="tc-detail-content">
-                        <!-- Content populated by JS -->
-                        <div class="flex flex-col items-center justify-center h-full text-slate-400">
-                            <span class="text-4xl mb-2">👈</span>
-                            <p>Select a Test Case from the list to view details</p>
-                        </div>
+            <!-- Top KPIs -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="glass-card p-5 relative overflow-hidden border-l-4 border-l-blue-500">
+                    <div class="flex justify-between items-start mb-2">
+                        <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wider">Data Archived</h3>
+                        <div class="p-2 bg-blue-50 rounded-lg"><i data-lucide="database" class="w-5 h-5 text-blue-600"></i></div>
                     </div>
+                    <div class="metric-value text-3xl font-bold text-slate-900" id="arcKpiData">-</div>
+                    <div class="mt-2 text-sm text-slate-500">Base-10 Calculation</div>
+                    <div class="absolute -bottom-4 -right-4 text-slate-50 opacity-50"><i data-lucide="database" class="w-24 h-24"></i></div>
+                </div>
+
+                <div class="glass-card p-5 relative overflow-hidden border-l-4 border-l-brand-500">
+                    <div class="flex justify-between items-start mb-2">
+                        <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wider">Avg Throughput</h3>
+                        <div class="p-2 bg-brand-50 rounded-lg"><i data-lucide="gauge" class="w-5 h-5 text-brand-600"></i></div>
+                    </div>
+                    <div class="metric-value text-3xl font-bold text-slate-900" id="arcKpiThroughput">-</div>
+                    <div class="mt-2 text-sm text-slate-500" id="arcKpiObjThroughput">Objects/hr</div>
+                    <div class="absolute -bottom-4 -right-4 text-slate-50 opacity-50"><i data-lucide="gauge" class="w-24 h-24"></i></div>
+                </div>
+
+                <div class="glass-card p-5 relative overflow-hidden border-l-4 border-l-green-500 bg-green-50/20">
+                    <div class="flex justify-between items-start mb-2">
+                        <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wider">Files Archived</h3>
+                        <div class="p-2 bg-green-100 rounded-lg"><i data-lucide="check-circle" class="w-5 h-5 text-green-600"></i></div>
+                    </div>
+                    <div class="metric-value text-3xl font-bold text-slate-900" id="arcKpiSuccessFiles">-</div>
+                    <div class="mt-2 text-sm text-green-600 font-medium" id="arcKpiSuccessRate">% Success Rate</div>
+                    <div class="absolute -bottom-4 -right-4 text-green-50 opacity-50"><i data-lucide="check-circle" class="w-24 h-24"></i></div>
+                </div>
+
+                <div class="glass-card p-5 relative overflow-hidden border-l-4 border-l-red-500 bg-red-50/20">
+                    <div class="flex justify-between items-start mb-2">
+                        <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wider">Failed / Warned</h3>
+                        <div class="p-2 bg-red-100 rounded-lg"><i data-lucide="x-circle" class="w-5 h-5 text-red-600"></i></div>
+                    </div>
+                    <div class="metric-value text-3xl font-bold text-red-600" id="arcKpiErrorFiles">-</div>
+                    <div class="mt-2 text-sm text-red-500 font-medium" id="arcKpiErrorRate">% Failure Rate</div>
+                    <div class="absolute -bottom-4 -right-4 text-red-50 opacity-50"><i data-lucide="x-circle" class="w-24 h-24"></i></div>
                 </div>
             </div>
-        </section>
 
-        <!-- Section 3: Performance Forecast -->
-        <section class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                <div class="mb-6">
-                    <h2 class="text-xl font-bold text-slate-900">Performance Forecast Baseline</h2>
-                    <p class="text-sm text-slate-600">Comparision of expected throughput (Files/Sec vs Docs/Sec) across selected test cases. Use this to identify expected bottlenecks.</p>
-                </div>
-                <div class="chart-container">
-                    <canvas id="perfChart"></canvas>
-                </div>
-            </div>
-
-            <div class="lg:col-span-1 space-y-6">
-                 <!-- Toolchain Strategy -->
-                 <div class="bg-indigo-50 rounded-xl border border-indigo-100 p-6">
-                    <h3 class="text-lg font-bold text-indigo-900 mb-3">🛠️ Data Gen Toolchain</h3>
-                    <ul class="space-y-3 text-sm text-indigo-800">
-                        <li class="flex items-start">
-                            <span class="mr-2">🐍</span>
-                            <span><strong>Python Orchestrator:</strong> Routes creation 40/40/20. Uses <code>multiprocessing</code>.</span>
-                        </li>
-                        <li class="flex items-start">
-                            <span class="mr-2">💾</span>
-                            <span><strong>FIO:</strong> Generates incompressible payloads for large files.</span>
-                        </li>
-                        <li class="flex items-start">
-                            <span class="mr-2">📂</span>
-                            <span><strong>Bash:</strong> Rapid directory tree recursion for deep paths.</span>
-                        </li>
-                        <li class="flex items-start">
-                            <span class="mr-2">🛡️</span>
-                            <span><strong>PowerShell:</strong> Injects complex NTFS ACLs via AD groups.</span>
-                        </li>
-                    </ul>
-                </div>
-                
-                <!-- Quick Legend -->
-                <div class="bg-white rounded-xl border border-slate-200 p-6">
-                    <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4">Metric Definitions</h3>
-                    <div class="space-y-3 text-sm">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Details -->
+                <div class="glass-card p-0 lg:col-span-2 overflow-hidden flex flex-col">
+                    <div class="p-5 border-b border-slate-200 bg-slate-50">
+                        <h3 class="text-lg font-semibold text-slate-800">Job Execution Details</h3>
+                    </div>
+                    <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-y-6 gap-x-8 flex-1">
                         <div>
-                            <span class="font-semibold text-blue-600">Crawl Throughput:</span>
-                            <p class="text-slate-500">Rate at which StorageX enumerates files.</p>
+                            <div class="text-sm text-slate-500 mb-1">Data Engine</div>
+                            <div class="font-medium text-slate-900 flex items-center gap-2">
+                                <i data-lucide="server" class="w-4 h-4 text-slate-400"></i> wt30910043qv00
+                            </div>
                         </div>
                         <div>
-                            <span class="font-semibold text-teal-600">Indexing Rate:</span>
-                            <p class="text-slate-500">Rate at which metadata documents persist in ES.</p>
+                            <div class="text-sm text-slate-500 mb-1">Target Bucket</div>
+                            <div class="font-medium text-slate-900 flex items-center gap-2">
+                                <i data-lucide="hard-drive" class="w-4 h-4 text-slate-400"></i> sxa-noncomp-tpc-prod-1
+                            </div>
                         </div>
                         <div>
-                            <span class="font-semibold text-slate-700">P95 Latency:</span>
-                            <p class="text-slate-500">95% of requests complete faster than this time.</p>
+                            <div class="text-sm text-slate-500 mb-1">Endpoint</div>
+                            <div class="font-medium text-slate-900 flex items-center gap-2 text-blue-600 break-all">
+                                <i data-lucide="link" class="w-4 h-4 text-blue-400 flex-shrink-0"></i> https://tsgcys3.bnymellon.net:4443
+                            </div>
+                        </div>
+                        <div>
+                            <div class="text-sm text-slate-500 mb-1">Analysis Set</div>
+                            <div class="font-mono text-sm text-slate-900 bg-slate-100 px-2 py-1 rounded border border-slate-200 inline-block break-all">
+                                archive_CDOTTPC30_t30s30v49_wfp_v3
+                            </div>
+                        </div>
+                        <div class="md:col-span-2 border-t border-slate-100 pt-4 mt-2">
+                            <div class="flex flex-col md:flex-row justify-between items-center text-sm gap-4">
+                                <div class="w-full md:w-auto text-center md:text-left">
+                                    <span class="text-slate-500 block mb-1">Start Time</span>
+                                    <span class="font-medium text-slate-800">May 5, 2026, 8:39:52 PM</span>
+                                </div>
+                                <div class="text-center px-4 w-full md:w-auto">
+                                    <div class="w-32 h-px bg-slate-300 mx-auto mb-2 relative hidden md:block">
+                                        <div class="absolute -top-1.5 left-1/2 -translate-x-1/2 bg-white px-2 text-xs font-semibold text-slate-500" id="arcDetailDuration">01:16:22</div>
+                                    </div>
+                                    <div class="md:hidden text-xs font-semibold text-slate-500 mb-1">01:16:22</div>
+                                    <span class="text-xs text-slate-400 uppercase tracking-wide">Elapsed Time</span>
+                                </div>
+                                <div class="w-full md:w-auto text-center md:text-right">
+                                    <span class="text-slate-500 block mb-1">End Time</span>
+                                    <span class="font-medium text-slate-800">May 5, 2026, 9:56:15 PM</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Doughnut Chart -->
+                <div class="glass-card p-5">
+                    <h3 class="text-lg font-semibold text-slate-800 mb-4">Object Processing Breakdown</h3>
+                    <div class="h-[200px] relative w-full flex justify-center">
+                        <canvas id="errorChart"></canvas>
+                    </div>
+                    <div class="mt-4 flex flex-col gap-2 text-sm">
+                        <div class="flex justify-between items-center text-slate-600">
+                            <span class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-green-500"></span> Archived</span>
+                            <span class="font-semibold" id="arcLegendSuccess"></span>
+                        </div>
+                        <div class="flex justify-between items-center text-slate-600">
+                            <span class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-red-500"></span> Failed</span>
+                            <span class="font-semibold text-red-600" id="arcLegendFailed"></span>
+                        </div>
+                        <div class="flex justify-between items-center text-slate-600">
+                            <span class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-yellow-400"></span> Warned</span>
+                            <span class="font-semibold text-yellow-600" id="arcLegendWarned"></span>
                         </div>
                     </div>
                 </div>
             </div>
-        </section>
 
-        <!-- Section 4: Technical Specs (Queries) -->
-        <section class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <div class="p-6 bg-slate-50 border-b border-slate-200">
-                <h2 class="text-xl font-bold text-slate-900">Elasticsearch Validation Queries</h2>
-                <p class="text-sm text-slate-600">Run these via Kibana Dev Tools to validate ingestion quality and cluster performance.</p>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200">
-                <div class="p-6">
-                    <h3 class="text-sm font-bold text-slate-700 uppercase mb-3">KQL Discovery Filters</h3>
-                    <div class="bg-slate-900 rounded-lg p-4 font-mono text-xs text-green-400 overflow-x-auto">
-<pre># 1. High-value targets
-extension.keyword : "pst"
-
-# 2. Large Files (>100MB)
-file_size > 100000000
-
-# 3. Deeply Nested Data
-path_depth > 20
-
-# 4. ACL Validation
-exists:acl_entries</pre>
-                    </div>
+            <!-- Detailed Error Table -->
+            <div class="glass-card overflow-hidden">
+                <div class="p-5 border-b border-slate-200 bg-slate-50">
+                    <h3 class="text-lg font-semibold text-slate-800">Failure Diagnostics</h3>
                 </div>
-                <div class="p-6">
-                    <h3 class="text-sm font-bold text-slate-700 uppercase mb-3">Aggregation Payload (Dev Tools)</h3>
-                    <div class="bg-slate-900 rounded-lg p-4 font-mono text-xs text-blue-300 overflow-x-auto h-48 custom-scroll">
-<pre>GET /storagex-metadata-*/_search
-{
-  "size": 0,
-  "aggs": {
-    "unique_owners": { 
-      "cardinality": { "field": "owner.keyword" } 
-    },
-    "file_size_distribution": {
-      "histogram": { 
-        "field": "file_size", 
-        "interval": 10485760 
-      }
-    },
-    "crawl_time_stats": { 
-      "stats": { "field": "crawl_timestamp" } 
-    }
-  }
-}</pre>
-                    </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-white text-slate-500 text-xs uppercase tracking-wider border-b border-slate-200">
+                                <th class="p-4 font-semibold">Diagnostic Message</th>
+                                <th class="p-4 font-semibold">Category</th>
+                                <th class="p-4 font-semibold text-right">File Count</th>
+                                <th class="p-4 font-semibold text-right">% of Errors</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-sm divide-y divide-slate-100 bg-white">
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="p-4 font-medium text-slate-800">The system cannot find the file specified.</td>
+                                <td class="p-4"><span class="px-2 py-1 bg-red-100 text-red-700 border border-red-200 rounded text-xs">Failed</span></td>
+                                <td class="p-4 text-right font-semibold text-slate-700">40,020</td>
+                                <td class="p-4 text-right text-slate-500">98.31%</td>
+                            </tr>
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="p-4 font-medium text-slate-800">The system cannot find the path specified.</td>
+                                <td class="p-4"><span class="px-2 py-1 bg-red-100 text-red-700 border border-red-200 rounded text-xs">Failed</span></td>
+                                <td class="p-4 text-right font-semibold text-slate-700">686</td>
+                                <td class="p-4 text-right text-slate-500">1.69%</td>
+                            </tr>
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="p-4 font-medium text-slate-800">Access is Denied</td>
+                                <td class="p-4"><span class="px-2 py-1 bg-yellow-100 text-yellow-700 border border-yellow-200 rounded text-xs">Warned</span></td>
+                                <td class="p-4 text-right font-semibold text-slate-700">3</td>
+                                <td class="p-4 text-right text-slate-500">0.01%</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
-        </section>
 
-        <footer class="text-center text-slate-400 text-sm py-8">
-            <p>Generated based on Performance Benchmark Test Plan</p>
-        </footer>
+        </div>
 
     </main>
 
-    <!-- JavaScript Logic -->
     <script>
-        // --- DATA MODEL ---
-        const testCases = [
-            {
-                id: "TC-001", name: "HR Share Baseline", category: "Functional Baseline",
-                files: "50,000", size: "100 GB", avgSize: "2 MB",
-                depth: "3–5 levels", acl: "Standard (5-10 ACEs)",
-                objective: "Establish baseline for standard departmental unstructured data.",
-                metricsSX: ["Crawl Throughput", "Extract latency", "CPU utilization"],
-                metricsES: ["Indexing rate", "Refresh time", "Query latency (P95)"],
-                strategy: "Python (multiprocessing) + `fio` for 40/40/20 distribution",
-                query: "exists:acl_entries / Avg agg on acl_count",
-                baselineCrawl: 15000, baselineIndex: 10000, priority: "High"
-            },
-            {
-                id: "TC-002", name: "Finance Share Baseline", category: "Functional Baseline",
-                files: "100,000", size: "500 GB", avgSize: "5 MB",
-                depth: "4–6 levels", acl: "High (10-20 ACEs)",
-                objective: "Evaluate metadata extraction latency with elevated ACL count and larger file volume.",
-                metricsSX: ["ACL parsing time", "Scan completion time", "Memory avg/peak"],
-                metricsES: ["Bulk request latency", "Segment count", "Heap utilization"],
-                strategy: "PowerShell for precise NTFS ACL inheritance generation",
-                query: "path_depth > 5 / Percentiles agg on file_size",
-                baselineCrawl: 12000, baselineIndex: 8000, priority: "High"
-            },
-            {
-                id: "TC-003", name: "IT Operations Logs", category: "Functional Baseline",
-                files: "75,000", size: "750 GB", avgSize: "10 MB",
-                depth: "5–7 levels", acl: "Standard (5-10 ACEs)",
-                objective: "Measure throughput for mid-sized logs and installers.",
-                metricsSX: ["Data Throughput (MB/sec)", "CPU utilization", "Queue depth"],
-                metricsES: ["Indexing rate", "Shard size distribution"],
-                strategy: "Bash + `dd` + `fio` for mixed log/binary generation",
-                query: "extension.keyword : 'log' / Terms agg on extension.keyword",
-                baselineCrawl: 10000, baselineIndex: 7500, priority: "Medium"
-            },
-            {
-                id: "TC-004", name: "User Home Directories", category: "Functional Baseline",
-                files: "100,000", size: "500 GB", avgSize: "5 MB",
-                depth: "3 levels", acl: "Distinct per user",
-                objective: "Validate crawl partitioning across 500 parallel user root directories.",
-                metricsSX: ["Crawl Throughput", "Thread pool saturation", "Queue depth"],
-                metricsES: ["Refresh time", "Query latency (P99)"],
-                strategy: "Python + `faker` for 500 unique user dirs and ACL mapping",
-                query: "owner.keyword : * / Cardinality agg on owner.keyword",
-                baselineCrawl: 18000, baselineIndex: 12000, priority: "High"
-            },
-            {
-                id: "TC-005", name: "PST Archive Repo", category: "Functional Baseline",
-                files: "50,000", size: "25 TB", avgSize: "500 MB",
-                depth: "2 levels", acl: "Standard (5 ACEs)",
-                objective: "Test sustained data throughput and heap stability with max-tier file sizes.",
-                metricsSX: ["Data Throughput (MB/sec)", "Memory avg/peak", "Error rate"],
-                metricsES: ["Bulk request latency", "Field data memory"],
-                strategy: "Parallel `fio` focused on 50MB-1GB range limit",
-                query: "extension.keyword : 'pst' / Histogram on file_size",
-                baselineCrawl: 5000, baselineIndex: 4000, priority: "Medium"
-            },
-            {
-                id: "TC-006", name: "1M Single Directory", category: "Scale & Stress",
-                files: "1,000,000", size: "1 TB", avgSize: "1 MB",
-                depth: "1 level", acl: "Standard (5 ACEs)",
-                objective: "Push file system enumeration bounds and StorageX directory queue backlog.",
-                metricsSX: ["Queue depth", "Scan completion time", "Memory peak"],
-                metricsES: ["Rejected bulk requests", "Indexing rate"],
-                strategy: "Python `os` optimized fast-file creation + `fio`",
-                query: "file_size > 1000 / Stats agg on crawl_timestamp",
-                baselineCrawl: 0, baselineIndex: 5000, // Crawl bottleneck implies hard to quantify rate, using 0 for chart outlier or low val
-                baselineCrawlDisplay: "Bottleneck",
-                priority: "High"
-            },
-            {
-                id: "TC-007", name: "5M Multi-Level Scale", category: "Scale & Stress",
-                files: "5,000,000", size: "2.5 TB", avgSize: "500 KB",
-                depth: "8 levels", acl: "Standard (5 ACEs)",
-                objective: "Test endurance, index refresh impact, and thread pool exhaustion over long run.",
-                metricsSX: ["Crawl Throughput", "CPU/Memory peak", "Retry count"],
-                metricsES: ["Indexing rate", "Heap utilization", "Segment count"],
-                strategy: "Distributed Python generators across multiple NAS nodes",
-                query: "path_depth > 5 / Histogram on file_size",
-                baselineCrawl: 20000, baselineIndex: 15000, priority: "Critical"
-            },
-            {
-                id: "TC-008", name: "100K x 200MB Average", category: "Scale & Stress",
-                files: "100,000", size: "20 TB", avgSize: "200 MB",
-                depth: "4 levels", acl: "Standard (5 ACEs)",
-                objective: "Push maximum sustained StorageX data plane IO and ES bulk payload sizes.",
-                metricsSX: ["Data Throughput (MB/sec)", "Extract latency"],
-                metricsES: ["Bulk request latency", "Heap utilization", "Shard size"],
-                strategy: "`fio` sequential write profiles (200MB target)",
-                query: "file_size > 100000000 / Percentiles agg on file_size",
-                baselineCrawl: 3000, baselineIndex: 0, // Latency metric provided, converting to indicative rate for chart or hiding
-                baselineIndexDisplay: "< 50ms Latency",
-                priority: "Medium"
-            },
-            {
-                id: "TC-009", name: "Extreme ACL Density", category: "Scale & Stress",
-                files: "100,000", size: "100 GB", avgSize: "1 MB",
-                depth: "3 levels", acl: "Extreme (200 ACEs)",
-                objective: "Stress the ACL parsing engine and ES mapping pressure (JSON array explosion).",
-                metricsSX: ["ACL parsing time", "Metadata extraction time", "CPU util"],
-                metricsES: ["Field data memory", "Indexing rate", "Bulk request latency"],
-                strategy: "PowerShell scripting to inject 200+ distinct AD groups",
-                query: "exists:acl_entries / Avg agg on acl_count",
-                baselineCrawl: 0, // Spike
-                baselineCrawlDisplay: "Latency Spike",
-                baselineIndex: 4000, priority: "High"
-            },
-            {
-                id: "TC-010", name: "High Cardinality Owner", category: "Scale & Stress",
-                files: "500,000", size: "50 GB", avgSize: "100 KB",
-                depth: "4 levels", acl: "Variable",
-                objective: "Stress Elasticsearch keyword indexing, global ordinals, and cardinality aggregations.",
-                metricsSX: ["Crawl Throughput", "Memory utilization"],
-                metricsES: ["Heap utilization", "Query latency (P99)", "Field data memory"],
-                strategy: "Python + `faker` generating unique string payloads for owner",
-                query: "owner.keyword : * / Cardinality agg on owner.keyword",
-                baselineCrawl: 25000, baselineIndex: 18000, priority: "High"
-            },
-            {
-                id: "TC-011", name: "Zero-Byte Explosion", category: "Metadata Stress",
-                files: "500,000", size: "0 GB", avgSize: "0 KB",
-                depth: "3 levels", acl: "Standard (5 ACEs)",
-                objective: "Maximum metadata API stress without storage I/O drag. Tests pure software overhead.",
-                metricsSX: ["Crawl Throughput", "Queue depth", "CPU utilization"],
-                metricsES: ["Indexing rate", "Rejected bulk requests"],
-                strategy: "Bash `touch` / Python `os.mknod` parallel burst",
-                query: "file_size : 0 / Terms agg on extension.keyword",
-                baselineCrawl: 35000, baselineIndex: 25000, priority: "High"
-            },
-            {
-                id: "TC-012", name: "Deep Path Limit Testing", category: "Metadata Stress",
-                files: "100,000", size: "1 GB", avgSize: "10 KB",
-                depth: "50+ levels", acl: "Standard (5 ACEs)",
-                objective: "Push OS path limits (255 chars) to test StorageX buffer overruns and ES path tokenization.",
-                metricsSX: ["Error rate", "Retry count", "Scan completion time"],
-                metricsES: ["Indexing rate", "Mapping pressure"],
-                strategy: "Bash nested `mkdir -p` loop + `touch`",
-                query: "path_depth > 20 / Stats agg on path_depth",
-                baselineCrawl: 0, baselineCrawlDisplay: "Degradation",
-                baselineIndex: 15000, priority: "Medium"
-            },
-            {
-                id: "TC-013", name: "Directory Fan-Out", category: "Metadata Stress",
-                files: "500,000", size: "5 GB", avgSize: "10 KB",
-                depth: "2 levels", acl: "Standard (5 ACEs)",
-                objective: "Force StorageX directory enumeration timeouts (250K files per single folder).",
-                metricsSX: ["Queue depth", "Scan completion time", "Error rate"],
-                metricsES: ["Indexing rate", "Bulk request latency"],
-                strategy: "Python `os` direct system calls (bypassing shell limits)",
-                query: "path_depth : 2 / Histogram on file_size",
-                baselineCrawl: 0, baselineCrawlDisplay: "Enum Spikes",
-                baselineIndex: 10000, priority: "High"
-            },
-            {
-                id: "TC-014", name: "Timestamp Chaos", category: "Metadata Stress",
-                files: "200,000", size: "200 GB", avgSize: "1 MB",
-                depth: "4 levels", acl: "Standard (5 ACEs)",
-                objective: "Break sequential timeline caching; stress ES date indexing and segment merging.",
-                metricsSX: ["Metadata extraction time"],
-                metricsES: ["Segment count", "Indexing rate", "Query latency"],
-                strategy: "Python `os.utime` with randomized epochs (1975-2026)",
-                query: "crawl_timestamp : * / Stats agg on crawl_timestamp",
-                baselineCrawl: 18000, baselineIndex: 15000, priority: "Medium"
-            },
-            {
-                id: "TC-015", name: "Extension Cardinality", category: "Metadata Stress",
-                files: "1,000,000", size: "0 GB", avgSize: "0 KB",
-                depth: "3 levels", acl: "Standard (5 ACEs)",
-                objective: "Stress Elasticsearch mapping dynamic updates and Terms aggregation heap usage.",
-                metricsSX: ["Crawl Throughput"],
-                metricsES: ["Mapping pressure", "Field data memory", "Query latency (P99)"],
-                strategy: "Python UUID generator for random file extensions",
-                query: "extension.keyword : * / Terms agg on extension.keyword",
-                baselineCrawl: 30000, baselineIndex: 0, baselineIndexDisplay: "Mapping Explosion", priority: "Critical"
+        // ==========================================
+        // UTILITY FUNCTIONS & GLOBALS
+        // ==========================================
+        
+        // Single Page App View Switcher
+        window.switchView = function(viewId) {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden-view'));
+            document.getElementById(viewId).classList.remove('hidden-view');
+
+            document.querySelectorAll('.nav-tab').forEach(el => {
+                el.classList.remove('text-brand-600', 'border-brand-600');
+                el.classList.add('text-slate-500', 'border-transparent');
+            });
+            const activeTab = document.querySelector(`.nav-tab[data-target="${viewId}"]`);
+            if (activeTab) {
+                activeTab.classList.remove('text-slate-500', 'border-transparent');
+                activeTab.classList.add('text-brand-600', 'border-brand-600');
             }
+            
+            // Re-render icons if view switches
+            lucide.createIcons();
+            
+            // Fire a resize event so Chart.js correctly calculates widths when un-hiding a tab
+            window.dispatchEvent(new Event('resize'));
+            
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        const formatBytes = (bytes, decimals = 2) => {
+            if (!+bytes) return '0 Bytes';
+            const k = 1000; // Base-10 
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+        };
+
+        const formatNumber = (num) => new Intl.NumberFormat().format(num);
+
+        const parseDate = (dateStr) => {
+            if (!dateStr) return null;
+            return new Date(dateStr);
+        };
+
+        const getBadgeClass = (state) => {
+            if (state === 'Completed') return 'bg-green-100 text-green-800 border border-green-200';
+            if (state === 'In Progress') return 'bg-amber-100 text-amber-800 border border-amber-200';
+            if (state === 'Completed with Error') return 'bg-red-100 text-red-800 border border-red-200';
+            return 'bg-slate-100 text-slate-800 border border-slate-200';
+        };
+
+        // Export Functionality
+        window.exportToCSV = function() {
+            const isScanView = !document.getElementById('view-scans').classList.contains('hidden-view');
+            let csvContent = "";
+
+            if (isScanView) {
+                csvContent += "Scan Name,State,Start Time,End Time,Total Files,Total Folders,Total Bytes,Data Scanned,Avg File Size,Throughput\r\n";
+                scanProcessedData.forEach(job => {
+                    const name = `"${job.name}"`;
+                    const state = `"${job.state}"`;
+                    const start = `"${job.start}"`;
+                    const end = `"${job.end || ''}"`;
+                    const files = job.files;
+                    const folders = job.folders;
+                    const bytes = job.bytes;
+                    const dataStr = `"${job.computed.dataStr}"`;
+                    const avgSize = `"${job.computed.avgSizeStr}"`;
+                    const tp = `"${job.computed.throughputStr}"`;
+
+                    csvContent += `${name},${state},${start},${end},${files},${folders},${bytes},${dataStr},${avgSize},${tp}\r\n`;
+                });
+                downloadCSV(csvContent, "scan_analytics_export.csv");
+            } else {
+                csvContent += "Metric,Value\r\n";
+                csvContent += `Archive Policy Name,archive_CDOTTPC30_t30s30v49_wfp_v3\r\n`;
+                csvContent += `Endpoint/User,https://tsgcys3.bnymellon.net:4443\r\n`;
+                csvContent += `Bucket,sxa-noncomp-tpc-prod-1\r\n`;
+                csvContent += `Data Engine,wt30910043qv00\r\n`;
+                csvContent += `Start Time,May 5 2026 8:39:52 PM\r\n`;
+                csvContent += `End Time,May 5 2026 9:56:15 PM\r\n`;
+                csvContent += `Elapsed Time,01:16:22\r\n`;
+                csvContent += `Files Archived,${archiveJobData.filesArchived}\r\n`;
+                csvContent += `Files Failed,${archiveJobData.filesFailed}\r\n`;
+                csvContent += `Files Warned,${archiveJobData.filesWarned}\r\n`;
+                csvContent += `Bytes Archived,${archiveJobData.bytesArchived}\r\n`;
+                csvContent += `\r\n`; 
+                csvContent += "Diagnostic Message,Category,File Count,% of Errors\r\n";
+                csvContent += `"The system cannot find the file specified.","Failed",40020,"98.31%"\r\n`;
+                csvContent += `"The system cannot find the path specified.","Failed",686,"1.69%"\r\n`;
+                csvContent += `"Access is Denied","Warned",3,"0.01%"\r\n`;
+                
+                downloadCSV(csvContent, "archival_status_export.csv");
+            }
+        };
+
+        function downloadCSV(csvString, fileName) {
+            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", fileName);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // ==========================================
+        // VIEW 1: SCAN ANALYTICS LOGIC
+        // ==========================================
+
+        const scanJobsData = [
+            {"name": "DTDG85QA00XNAS_DTsvmHUBQA_hub_v1_qa_GF", "state": "Completed", "start": "5/5/2026, 6:56 AM", "end": "5/5/2026, 2:32 PM", "folders": 12, "files": 2149127, "bytes": 51549941390},
+            {"name": "DTDG85QA00XNAS_DTsvmTKDQA_tkd_v21_qa_GF", "state": "In Progress", "start": "5/5/2026, 6:55 AM", "end": null, "folders": 92401, "files": 2463805, "bytes": 19670374811631},
+            {"name": "DTDG85QA00XNAS_DTsvmCD1QA_cd1_v1_qa_GF", "state": "Completed", "start": "5/5/2026, 12:23 AM", "end": "5/5/2026, 4:57 AM", "folders": 278063, "files": 1458144, "bytes": 25851689285897},
+            {"name": "DTDG85QA00XNAS_DTsvmERUQA_eru_v17_qa_GF", "state": "Completed", "start": "5/4/2026, 4:19 PM", "end": "5/4/2026, 11:07 PM", "folders": 276952, "files": 1832113, "bytes": 250032385323},
+            {"name": "DTDG85QA00XNAS_DTsvmZF2QA_zf2_v1_qa_GF", "state": "Completed", "start": "5/4/2026, 12:09 PM", "end": "5/4/2026, 6:43 PM", "folders": 50390, "files": 1515434, "bytes": 553226242712},
+            {"name": "DTDG85QA00XNAS_DTsvmUNYQA_uny_v1_qa_GF", "state": "Completed", "start": "5/4/2026, 7:31 AM", "end": "5/4/2026, 4:16 PM", "folders": 1025912, "files": 1034912, "bytes": 669365100662},
+            {"name": "DTDG85QA00XNAS_DTsvmGVAQA_gva_v1_qa_GF", "state": "Completed", "start": "5/4/2026, 6:24 AM", "end": "5/4/2026, 12:06 PM", "folders": 4999, "files": 1358966, "bytes": 21939936677444},
+            {"name": "DTDG85QA00XNAS_DTsvmRPOQA_rpo_v5_qa_GF", "state": "Completed", "start": "5/3/2026, 10:58 PM", "end": "5/4/2026, 7:28 AM", "folders": 2085, "files": 1975555, "bytes": 3648408483886},
+            {"name": "DTDG85QA00XNAS_DTsvmSGLQA_sgl_v1_qa_GF", "state": "Completed", "start": "5/3/2026, 5:18 PM", "end": "5/3/2026, 11:39 PM", "folders": 18033, "files": 1503001, "bytes": 53816764585},
+            {"name": "DTDG85QA00XNAS_DTsvmAS3QA_as3_v1_qa_GF", "state": "Completed", "start": "5/3/2026, 3:19 PM", "end": "5/3/2026, 10:57 PM", "folders": 270530, "files": 1559834, "bytes": 566348567471},
+            {"name": "DTDG85QA00XNAS_DTsvmYBRQA_ybr_v3_qa_GF", "state": "Completed", "start": "5/3/2026, 11:33 AM", "end": "5/3/2026, 5:17 PM", "folders": 42432, "files": 1293793, "bytes": 221346515050},
+            {"name": "DCAN51QA00XNAS_DCsvmSMZQA_smz_v1_qa_GF", "state": "In Progress", "start": "5/3/2026, 8:20 AM", "end": null, "folders": 1724816, "files": 17085723, "bytes": 88099295521923},
+            {"name": "DTDG85QA00XNAS_DTsvmJIRQA_jir_v2_qa_GF", "state": "Completed", "start": "5/3/2026, 7:25 AM", "end": "5/3/2026, 3:15 PM", "folders": 832067, "files": 993720, "bytes": 10486127063852},
+            {"name": "DTDG85QA00XNAS_DTsvmRDKQA_rdk_v1_qa_GF", "state": "Completed", "start": "5/3/2026, 6:03 AM", "end": "5/3/2026, 11:30 AM", "folders": 74016, "files": 1249502, "bytes": 7997429710421},
+            {"name": "DTDG85QA00XNAS_DTsvmRPOQA_rpo_v4_qa_GF", "state": "Completed", "start": "5/3/2026, 12:28 AM", "end": "5/3/2026, 7:21 AM", "folders": 20642, "files": 1571627, "bytes": 2235209324581},
+            {"name": "DTDG85QA00XNAS_DTsvmNXXQA_nxx_v2_qa_GF", "state": "Completed", "start": "5/3/2026, 12:26 AM", "end": "5/3/2026, 6:01 AM", "folders": 120273, "files": 1155055, "bytes": 387953801824},
+            {"name": "DTDG85QA00XNAS_DTsvmGO2QA_go2_v7_qa_GF", "state": "Completed", "start": "5/2/2026, 8:18 PM", "end": "5/3/2026, 12:01 AM", "folders": 158, "files": 1246796, "bytes": 45063100098},
+            {"name": "DTDG85QA00XNAS_DTsvmRPOQA_rpo_v9_qa_GF", "state": "Completed", "start": "5/2/2026, 5:03 PM", "end": "5/2/2026, 6:59 PM", "folders": 3355, "files": 662221, "bytes": 748569573854},
+            {"name": "DTDG85QA00XNAS_DTsvmDMUQA_dmu_v6_qa_GF", "state": "Completed", "start": "5/2/2026, 4:12 PM", "end": "5/2/2026, 4:12 PM", "folders": 79, "files": 222, "bytes": 244382846654},
+            {"name": "DTDG85QA00XNAS_DTsvmDPGQA_dpg_v2_qa_GF", "state": "Completed with Error", "start": "5/2/2026, 4:12 PM", "end": "5/2/2026, 4:12 PM", "folders": 18, "files": 260, "bytes": 1715944665},
+            { "name": "DTDG85QA00XNAS_DTsvmXIPQA_xip_v1_qa_GF", "state": "Completed", "start": "5/11/2026, 8:04 AM", "end": "5/11/2026, 7:46 PM", "folders": 55480, "files": 1368557, "bytes": 8590781617124 },
+            { "name": "DTDG85QA00XNAS_DTsvmEBIQA_ebi_v2_qa_GF", "state": "In Progress", "start": "5/9/2026, 7:31 PM", "end": "", "folders": 13347694, "files": 6809136, "bytes": 1855849659931 },
+            { "name": "DTDG85QA00XNAS_DTsvmCBPQA_cbp_v2_qa_GF", "state": "In Progress", "start": "5/9/2026, 4:51 PM", "end": "", "folders": 561030, "files": 5406536, "bytes": 29509550739461 },
+            { "name": "DTDG85QA00XNAS_DTsvmRPOQA_rpo_v11_qa_GF", "state": "Completed", "start": "5/9/2026, 3:26 AM", "end": "5/11/2026, 8:01 AM", "folders": 225679, "files": 8106252, "bytes": 148404983408115 },
+            { "name": "DTDG85QA00XNAS_DTsvmODHQA_odh_v1_qa_GF", "state": "Completed with Error", "start": "5/8/2026, 1:10 PM", "end": "5/9/2026, 12:03 PM", "folders": 701595, "files": 4580624, "bytes": 38721951274803 },
+            { "name": "DTDG85QA00XNAS_DTsvmFLOQA_flo_v1_qa_GF", "state": "Completed", "start": "5/8/2026, 8:31 AM", "end": "5/9/2026, 3:23 AM", "folders": 908, "files": 4553000, "bytes": 52628893437223 },
+            { "name": "DTDG85QA00XNAS_DTsvmERIQA_eri_v2_qa_GF", "state": "Completed", "start": "5/7/2026, 7:40 PM", "end": "5/8/2026, 7:27 AM", "folders": 89940, "files": 2879103, "bytes": 30567486566885 },
+            { "name": "DTDG85QA00XNAS_DTsvmRPOQA_rpo_v16_qa_GF", "state": "Completed", "start": "5/7/2026, 5:35 PM", "end": "5/8/2026, 4:28 AM", "folders": 22878, "files": 2625801, "bytes": 7037581431265 },
+            { "name": "DCAN51QA00XNAS_DCsvmRPOQA_rpo_v12_qa_GF", "state": "In Progress", "start": "5/7/2026, 5:34 PM", "end": "", "folders": 423292, "files": 20036593, "bytes": 4938507522115 }
         ];
 
-        // --- GLOBAL VARIABLES ---
-        let currentFilter = 'all';
-        let perfChartInstance = null;
-        let distChartInstance = null;
+        const currentDate = new Date("5/11/2026, 8:38 PM");
 
-        // --- INIT ---
-        document.addEventListener('DOMContentLoaded', () => {
-            initDashboard();
-            renderList();
-            renderDistChart();
-            renderPerfChart();
-            // Select first item by default
-            selectTestCase(testCases[0].id);
+        const calculateScanMetrics = (job) => {
+            const start = parseDate(job.start);
+            const end = job.end ? parseDate(job.end) : currentDate;
+            let hours = (end - start) / (1000 * 60 * 60);
+            if(hours <= 0) hours = 0.01;
+
+            const totalObjects = job.files + job.folders;
+            // The file size math fix: Ensure it considers only job.files, properly avoiding divide by zero
+            const avgFileSize = job.files > 0 ? (job.bytes / job.files) : 0;
+            const tbPerHour = (job.bytes / Math.pow(1000, 4)) / hours;
+
+            return {
+                dataStr: formatBytes(job.bytes),
+                avgSizeStr: formatBytes(avgFileSize),
+                throughputStr: `${tbPerHour.toFixed(2)} TB/hr`,
+                rawBytes: job.bytes,
+                rawAvg: avgFileSize,
+                rawTp: tbPerHour,
+                totalObjects: totalObjects,
+                hours: hours
+            };
+        };
+
+        let scanGlobalMetrics = {
+            totalBytes: 0,
+            totalObjects: 0,
+            completed: 0,
+            inProgress: 0,
+            error: 0,
+            peakThroughput: 0,
+            peakJobName: "",
+            dailyVolumes: {}, 
+            dailyObjects: {}, 
+            dailyMinTime: {}, 
+            dailyMaxTime: {},
+            systemMinStart: Infinity,
+            systemMaxEnd: -Infinity
+        };
+
+        const scanProcessedData = scanJobsData.map(job => {
+            const m = calculateScanMetrics(job);
+            
+            scanGlobalMetrics.totalBytes += job.bytes;
+            scanGlobalMetrics.totalObjects += m.totalObjects;
+            
+            if (job.state === "Completed") scanGlobalMetrics.completed++;
+            else if (job.state === "In Progress") scanGlobalMetrics.inProgress++;
+            else scanGlobalMetrics.error++;
+
+            if (m.hours > 0.1 && m.rawTp > scanGlobalMetrics.peakThroughput) {
+                scanGlobalMetrics.peakThroughput = m.rawTp;
+                scanGlobalMetrics.peakJobName = job.name.split('_').slice(2,4).join('_') || job.name;
+            }
+
+            const sTime = parseDate(job.start);
+            const eTime = job.end ? parseDate(job.end) : currentDate;
+
+            if (sTime < scanGlobalMetrics.systemMinStart) scanGlobalMetrics.systemMinStart = sTime;
+            if (eTime > scanGlobalMetrics.systemMaxEnd) scanGlobalMetrics.systemMaxEnd = eTime;
+
+            const dateKey = job.start.split(',')[0].trim();
+            if(!scanGlobalMetrics.dailyVolumes[dateKey]) {
+                scanGlobalMetrics.dailyVolumes[dateKey] = 0;
+                scanGlobalMetrics.dailyObjects[dateKey] = 0;
+            }
+            
+            scanGlobalMetrics.dailyVolumes[dateKey] += job.bytes;
+            scanGlobalMetrics.dailyObjects[dateKey] += m.totalObjects;
+
+            if(!scanGlobalMetrics.dailyMinTime[dateKey] || sTime < scanGlobalMetrics.dailyMinTime[dateKey]) scanGlobalMetrics.dailyMinTime[dateKey] = sTime;
+            if(!scanGlobalMetrics.dailyMaxTime[dateKey] || eTime > scanGlobalMetrics.dailyMaxTime[dateKey]) scanGlobalMetrics.dailyMaxTime[dateKey] = eTime;
+
+            return { ...job, computed: m };
         });
 
-        // --- FUNCTIONS ---
+        // Update Scan KPIs
+        const systemDurationHours = (scanGlobalMetrics.systemMaxEnd - scanGlobalMetrics.systemMinStart) / (1000 * 60 * 60);
+        const systemThroughput = (scanGlobalMetrics.totalBytes / Math.pow(1000, 4)) / systemDurationHours;
 
-        function initDashboard() {
-            // Count totals
-            // Note: Simplistic summing of strings, in a real app would parse '50,000'
-            // Using pre-calculated values for the KPI cards as per the plan summary.
-            // 9.2M is summed manually from the table data.
-        }
+        document.getElementById('kpiSystemThroughput').innerHTML = `${systemThroughput.toFixed(2)} <span class="text-lg text-brand-500 font-normal">TB/hr</span>`;
+        document.getElementById('kpiTotalData').innerHTML = `${(scanGlobalMetrics.totalBytes / Math.pow(1000, 4)).toFixed(2)} <span class="text-lg text-slate-500 font-normal">TB</span>`;
+        document.getElementById('kpiTotalObjects').innerHTML = `${(scanGlobalMetrics.totalObjects / 1000000).toFixed(2)} <span class="text-lg text-slate-500 font-normal">M</span>`;
+        document.getElementById('kpiTotalObjects').title = `Exact Total: ${formatNumber(scanGlobalMetrics.totalObjects)}`;
+        document.getElementById('kpiTotalJobs').innerText = scanJobsData.length;
+        document.getElementById('kpiPeakThroughput').innerHTML = `${scanGlobalMetrics.peakThroughput.toFixed(2)} <span class="text-lg text-slate-500 font-normal">TB/hr</span>`;
+        document.getElementById('kpiPeakJob').innerText = `Job: ${scanGlobalMetrics.peakJobName}`;
+        
+        document.getElementById('kpiJobBreakdown').innerHTML = `
+            <div class="flex items-center gap-1 text-green-600"><span class="w-2 h-2 rounded-full bg-green-500"></span> ${scanGlobalMetrics.completed} Done</div>
+            <div class="flex items-center gap-1 text-amber-500"><span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span> ${scanGlobalMetrics.inProgress} Active</div>
+            <div class="flex items-center gap-1 text-red-500"><span class="w-2 h-2 rounded-full bg-red-500"></span> ${scanGlobalMetrics.error} Error</div>
+        `;
 
-        function filterTests(category) {
-            currentFilter = category;
-            
-            // Update buttons
-            document.querySelectorAll('.filter-btn').forEach(btn => {
-                if (btn.dataset.filter === category) {
-                    btn.classList.add('bg-blue-600', 'text-white', 'shadow-sm');
-                    btn.classList.remove('bg-white', 'text-slate-700', 'border', 'hover:bg-slate-50');
-                } else {
-                    btn.classList.remove('bg-blue-600', 'text-white', 'shadow-sm');
-                    btn.classList.add('bg-white', 'text-slate-700', 'border', 'hover:bg-slate-50');
-                }
-            });
-
-            renderList();
-            updatePerfChart();
-        }
-
-        function renderList() {
-            const listContainer = document.getElementById('tc-list');
-            listContainer.innerHTML = '';
-
-            const filtered = currentFilter === 'all' 
-                ? testCases 
-                : testCases.filter(tc => tc.category === currentFilter);
-
-            filtered.forEach(tc => {
-                const priorityColor = tc.priority === 'Critical' ? 'text-red-600 bg-red-50' : 
-                                      tc.priority === 'High' ? 'text-orange-600 bg-orange-50' : 
-                                      'text-blue-600 bg-blue-50';
-
-                const div = document.createElement('div');
-                div.className = `p-4 cursor-pointer hover:bg-slate-50 transition-colors border-l-4 border-transparent`;
-                div.id = `row-${tc.id}`;
-                div.onclick = () => selectTestCase(tc.id);
-                div.innerHTML = `
-                    <div class="flex justify-between items-start mb-1">
-                        <span class="font-mono text-xs text-slate-400 font-bold">${tc.id}</span>
-                        <span class="text-xs font-medium px-2 py-0.5 rounded-full ${priorityColor}">${tc.priority}</span>
+        // Render Top / Bottom Insights
+        const validAnalyticalJobs = scanProcessedData.filter(j => j.computed.hours > 0.1 && j.state === 'Completed');
+        const sortedByTp = [...validAnalyticalJobs].sort((a, b) => b.computed.rawTp - a.computed.rawTp);
+        
+        const topJobsList = document.getElementById('topJobsList');
+        sortedByTp.slice(0, 3).forEach((job, index) => {
+            topJobsList.innerHTML += `
+                <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-100 hover:bg-white transition-colors cursor-pointer gap-4" onclick="switchView('view-archives')">
+                    <div class="flex items-start gap-3 w-full overflow-hidden">
+                        <div class="w-6 h-6 rounded bg-green-100 text-green-700 font-bold text-xs flex justify-center items-center flex-shrink-0 mt-0.5">#${index+1}</div>
+                        <div class="overflow-hidden w-full">
+                            <div class="font-medium text-slate-800 text-sm break-all leading-tight mb-1" title="${job.name}">${job.name}</div>
+                            <div class="text-xs text-slate-500">Avg File Size: ${job.computed.avgSizeStr}</div>
+                        </div>
                     </div>
-                    <h3 class="text-sm font-semibold text-slate-900 mb-1 leading-tight">${tc.name}</h3>
-                    <p class="text-xs text-slate-500 truncate">${tc.objective}</p>
+                    <div class="font-bold text-brand-600 flex flex-col items-end flex-shrink-0">
+                        <span>${job.computed.rawTp.toFixed(2)} <span class="text-xs font-normal text-slate-500">TB/hr</span></span>
+                    </div>
+                </div>`;
+        });
+
+        const bottomJobsList = document.getElementById('bottomJobsList');
+        const reverseSorted = [...sortedByTp].reverse();
+        reverseSorted.slice(0, 3).forEach((job, index) => {
+            bottomJobsList.innerHTML += `
+                <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-100 gap-4">
+                    <div class="flex items-start gap-3 w-full overflow-hidden">
+                        <div class="w-6 h-6 rounded bg-red-100 text-red-700 font-bold text-xs flex justify-center items-center flex-shrink-0 mt-0.5">#${index+1}</div>
+                        <div class="overflow-hidden w-full">
+                            <div class="font-medium text-slate-800 text-sm break-all leading-tight mb-1" title="${job.name}">${job.name}</div>
+                            <div class="text-xs text-slate-500">Avg File Size: ${job.computed.avgSizeStr}</div>
+                        </div>
+                    </div>
+                    <div class="font-bold text-slate-600 flex-shrink-0">${(job.computed.rawTp * 1024).toFixed(2)} <span class="text-xs font-normal">GB/hr</span></div>
+                </div>`;
+        });
+
+        // Scan Table
+        const scanTbody = document.getElementById('tableBody');
+        window.scanColWidth = 220;
+        window.currentScanData = scanProcessedData;
+
+        window.adjustColWidth = function(delta, event) {
+            event.stopPropagation();
+            window.scanColWidth = Math.max(150, Math.min(1200, window.scanColWidth + delta));
+            renderScanTable(window.currentScanData);
+        };
+
+        const renderScanTable = (data) => {
+            window.currentScanData = data;
+            scanTbody.innerHTML = '';
+            data.forEach(job => {
+                const m = job.computed;
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 transition-colors';
+                tr.innerHTML = `
+                    <td class="p-4"><div class="font-medium text-slate-900 truncate transition-all duration-200" style="max-width: ${window.scanColWidth}px;" title="${job.name}">${job.name}</div></td>
+                    <td class="p-4"><span class="px-2.5 py-1 text-xs font-medium border rounded-full ${getBadgeClass(job.state)}">${job.state}</span></td>
+                    <td class="p-4 text-slate-500 whitespace-nowrap">${job.start.split(',')[0]} <span class="text-xs">${job.start.split(',')[1]}</span></td>
+                    <td class="p-4 text-right text-slate-500 font-tabular-nums">${formatNumber(job.files)}</td>
+                    <td class="p-4 text-right font-medium text-slate-700">${m.dataStr}</td>
+                    <td class="p-4 text-right text-slate-500">${m.avgSizeStr}</td>
+                    <td class="p-4 text-right font-medium ${m.rawTp > 1 ? 'text-brand-600' : 'text-slate-600'}">${m.throughputStr}</td>
                 `;
-                listContainer.appendChild(div);
+                scanTbody.appendChild(tr);
             });
-        }
+            // Important: Redraw icons after DOM injection
+            lucide.createIcons();
+        };
+        
+        renderScanTable(scanProcessedData);
 
-        function selectTestCase(id) {
-            // Highlight row
-            document.querySelectorAll('#tc-list > div').forEach(el => {
-                el.classList.remove('active-row');
-                if (el.id === `row-${id}`) el.classList.add('active-row');
+        let sortAsc = false;
+        window.sortTable = (colIndex) => {
+            sortAsc = !sortAsc;
+            const sortedData = [...scanProcessedData].sort((a, b) => {
+                let valA, valB;
+                if (colIndex === 0) { valA = a.name; valB = b.name; }
+                if (colIndex === 1) { valA = a.state; valB = b.state; }
+                if (colIndex === 2) { valA = parseDate(a.start); valB = parseDate(b.start); }
+                if (colIndex === 3) { valA = a.files; valB = b.files; }
+                if (colIndex === 4) { valA = a.computed.rawBytes; valB = b.computed.rawBytes; }
+                if (colIndex === 5) { valA = a.computed.rawAvg; valB = b.computed.rawAvg; }
+                if (colIndex === 6) { valA = a.computed.rawTp; valB = b.computed.rawTp; }
+                if (valA < valB) return sortAsc ? -1 : 1;
+                if (valA > valB) return sortAsc ? 1 : -1;
+                return 0;
             });
+            renderScanTable(sortedData);
+        };
 
-            const tc = testCases.find(t => t.id === id);
-            if (!tc) return;
+        // Scan Charts
+        const sortedDates = Object.keys(scanGlobalMetrics.dailyVolumes).sort((a,b) => parseDate(a) - parseDate(b));
+        const chartVolumesTB = sortedDates.map(d => scanGlobalMetrics.dailyVolumes[d] / Math.pow(1000, 4));
+        
+        new Chart(document.getElementById('volumeChart').getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: sortedDates,
+                datasets: [{
+                    label: 'Data Scanned (TB)', data: chartVolumesTB, backgroundColor: '#14b8a6', borderRadius: 4, barPercentage: 0.6
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#f1f5f9' }, border: { display: false } }, x: { grid: { display: false }, border: { display: false } } } }
+        });
 
-            // Render Detail
-            const content = document.getElementById('tc-detail-content');
-            
-            // Format Metrics lists
-            const sxMetrics = tc.metricsSX.map(m => `<li class="flex items-center"><span class="w-1.5 h-1.5 rounded-full bg-blue-500 mr-2"></span>${m}</li>`).join('');
-            const esMetrics = tc.metricsES.map(m => `<li class="flex items-center"><span class="w-1.5 h-1.5 rounded-full bg-teal-500 mr-2"></span>${m}</li>`).join('');
+        const chartObjectsM = sortedDates.map(d => scanGlobalMetrics.dailyObjects[d] / 1000000);
+        const chartSpeedK = sortedDates.map(d => {
+            let windowHrs = (scanGlobalMetrics.dailyMaxTime[d] - scanGlobalMetrics.dailyMinTime[d]) / (1000 * 60 * 60);
+            if (windowHrs <= 0) windowHrs = 0.01;
+            return (scanGlobalMetrics.dailyObjects[d] / windowHrs) / 1000;
+        });
 
-            content.innerHTML = `
-                <div class="animate-fade-in">
-                    <div class="flex items-center justify-between mb-4">
-                        <h2 class="text-2xl font-bold text-slate-900">${tc.id}: ${tc.name}</h2>
-                        <span class="px-3 py-1 bg-slate-200 text-slate-700 rounded-full text-xs font-bold uppercase">${tc.category}</span>
-                    </div>
+        new Chart(document.getElementById('objectsChart').getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: sortedDates,
+                datasets: [
+                    { type: 'line', label: 'Speed (K/hr)', data: chartSpeedK, borderColor: '#f59e0b', backgroundColor: '#f59e0b', borderWidth: 2, tension: 0.3, yAxisID: 'y1' },
+                    { type: 'bar', label: 'Objects (M)', data: chartObjectsM, backgroundColor: '#8b5cf6', borderRadius: 4, barPercentage: 0.6, yAxisID: 'y' }
+                ]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', labels: { boxWidth: 10, usePointStyle: true, font: {size: 11} } } }, scales: { y: { type: 'linear', position: 'left', title: { display: true, text: 'Objects (M)', color: '#64748b', font: {size: 10} }, grid: { color: '#f1f5f9' }, border: { display: false } }, y1: { type: 'linear', position: 'right', title: { display: true, text: 'Speed (K/hr)', color: '#64748b', font: {size: 10} }, grid: { drawOnChartArea: false }, border: { display: false } }, x: { grid: { display: false }, border: { display: false } } } }
+        });
 
-                    <p class="text-slate-600 text-base mb-6 bg-white p-4 rounded-lg border border-slate-200 italic">
-                        "${tc.objective}"
-                    </p>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                        <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-100">
-                            <h3 class="text-xs font-bold text-slate-400 uppercase mb-3">Dataset Profile</h3>
-                            <div class="space-y-2 text-sm">
-                                <div class="flex justify-between"><span class="text-slate-500">Total Files:</span> <span class="font-mono font-semibold">${tc.files}</span></div>
-                                <div class="flex justify-between"><span class="text-slate-500">Total Size:</span> <span class="font-mono font-semibold">${tc.size}</span></div>
-                                <div class="flex justify-between"><span class="text-slate-500">Avg Size:</span> <span class="font-mono font-semibold">${tc.avgSize}</span></div>
-                                <div class="flex justify-between"><span class="text-slate-500">Dir Depth:</span> <span class="font-mono font-semibold">${tc.depth}</span></div>
-                                <div class="flex justify-between"><span class="text-slate-500">ACLs:</span> <span class="font-mono font-semibold">${tc.acl}</span></div>
-                            </div>
-                        </div>
+        // ==========================================
+        // VIEW 2: ARCHIVAL STATUS LOGIC
+        // ==========================================
 
-                        <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-100">
-                            <h3 class="text-xs font-bold text-slate-400 uppercase mb-3">Expected Baseline</h3>
-                            <div class="space-y-4">
-                                <div>
-                                    <div class="flex justify-between text-sm mb-1">
-                                        <span class="text-slate-600">Crawl Rate</span>
-                                        <span class="font-bold text-blue-600">${tc.baselineCrawlDisplay || tc.baselineCrawl + ' files/sec'}</span>
-                                    </div>
-                                    <div class="w-full bg-slate-100 rounded-full h-2">
-                                        <div class="bg-blue-500 h-2 rounded-full" style="width: ${Math.min(100, (tc.baselineCrawl / 35000) * 100)}%"></div>
-                                    </div>
-                                </div>
-                                <div>
-                                    <div class="flex justify-between text-sm mb-1">
-                                        <span class="text-slate-600">Index Rate</span>
-                                        <span class="font-bold text-teal-600">${tc.baselineIndexDisplay || tc.baselineIndex + ' docs/sec'}</span>
-                                    </div>
-                                    <div class="w-full bg-slate-100 rounded-full h-2">
-                                        <div class="bg-teal-500 h-2 rounded-full" style="width: ${Math.min(100, (tc.baselineIndex / 25000) * 100)}%"></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+        const archiveJobData = {
+            elapsedTimeStr: "01:16:22", filesArchived: 374278, filesFailed: 40706, filesWarned: 3, bytesArchived: 114584052286, bytesWarned: 78526
+        };
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                        <div>
-                            <h4 class="font-bold text-slate-900 mb-2 text-sm flex items-center">
-                                <span class="bg-blue-100 text-blue-600 p-1 rounded mr-2 text-xs">StorageX</span> Metrics
-                            </h4>
-                            <ul class="text-sm text-slate-600 space-y-1 ml-1">
-                                ${sxMetrics}
-                            </ul>
-                        </div>
-                        <div>
-                            <h4 class="font-bold text-slate-900 mb-2 text-sm flex items-center">
-                                <span class="bg-teal-100 text-teal-600 p-1 rounded mr-2 text-xs">Elastic</span> Metrics
-                            </h4>
-                            <ul class="text-sm text-slate-600 space-y-1 ml-1">
-                                ${esMetrics}
-                            </ul>
-                        </div>
-                    </div>
+        const parts = archiveJobData.elapsedTimeStr.split(":");
+        const arcHoursRun = parseInt(parts[0], 10) + (parseInt(parts[1], 10) / 60) + (parseInt(parts[2], 10) / 3600);
+        const arcTotalObjects = archiveJobData.filesArchived + archiveJobData.filesFailed + archiveJobData.filesWarned;
+        
+        // Correcting the error rate to include warnings as requested by sanity checks
+        const totalFailedWarned = archiveJobData.filesFailed + archiveJobData.filesWarned;
+        
+        document.getElementById('arcKpiData').innerHTML = `${formatBytes(archiveJobData.bytesArchived).replace('GB', '<span class="text-lg text-slate-500 font-normal">GB</span>')}`;
+        document.getElementById('arcKpiThroughput').innerHTML = `${((archiveJobData.bytesArchived / Math.pow(1000, 3)) / arcHoursRun).toFixed(2)} <span class="text-lg text-slate-500 font-normal">GB/hr</span>`;
+        document.getElementById('arcKpiObjThroughput').innerText = `${formatNumber(Math.round(archiveJobData.filesArchived / arcHoursRun))} Objects/hr`;
+        document.getElementById('arcKpiSuccessFiles').innerText = formatNumber(archiveJobData.filesArchived);
+        document.getElementById('arcKpiSuccessRate').innerHTML = `<i data-lucide="trending-up" class="w-4 h-4 inline"></i> ${((archiveJobData.filesArchived / arcTotalObjects) * 100).toFixed(2)}% Success`;
+        
+        document.getElementById('arcKpiErrorFiles').innerText = formatNumber(totalFailedWarned);
+        document.getElementById('arcKpiErrorRate').innerHTML = `<i data-lucide="alert-circle" class="w-4 h-4 inline"></i> ${((totalFailedWarned / arcTotalObjects) * 100).toFixed(2)}% Failure`;
 
-                    <div class="mb-4">
-                        <h4 class="font-bold text-slate-900 mb-2 text-sm">Data Generation Strategy</h4>
-                        <div class="bg-slate-800 text-slate-200 p-3 rounded text-sm font-mono border-l-4 border-indigo-500">
-                            ${tc.strategy.replace(/`/g, '')}
-                        </div>
-                    </div>
+        document.getElementById('arcLegendSuccess').innerText = formatNumber(archiveJobData.filesArchived);
+        document.getElementById('arcLegendFailed').innerText = formatNumber(archiveJobData.filesFailed);
+        document.getElementById('arcLegendWarned').innerText = formatNumber(archiveJobData.filesWarned);
 
-                     <div>
-                        <h4 class="font-bold text-slate-900 mb-2 text-sm">Validation Query Logic</h4>
-                        <div class="bg-slate-100 text-slate-600 p-3 rounded text-sm font-mono">
-                            ${tc.query}
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
+        new Chart(document.getElementById('errorChart').getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: ['Archived', 'Failed', 'Warned'],
+                datasets: [{ data: [archiveJobData.filesArchived, archiveJobData.filesFailed, archiveJobData.filesWarned], backgroundColor: ['#10b981', '#ef4444', '#facc15'], borderWidth: 0, hoverOffset: 4 }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, cutout: '75%', plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(context) { return ` ${formatNumber(context.raw)} files (${((context.raw / arcTotalObjects) * 100).toFixed(2)}%)`; } } } } }
+        });
 
-        // --- CHARTS ---
-
-        function renderDistChart() {
-            const ctx = document.getElementById('distChart').getContext('2d');
-            distChartInstance = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Small (0-100KB)', 'Medium (100KB-50MB)', 'Large (50MB-1GB)'],
-                    datasets: [{
-                        data: [40, 40, 20],
-                        backgroundColor: ['#93c5fd', '#3b82f6', '#1e40af'],
-                        borderWidth: 0
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: { 
-                            callbacks: {
-                                label: (ctx) => ` ${ctx.label}: ${ctx.raw}%`
-                            }
-                        }
-                    },
-                    cutout: '65%'
-                }
-            });
-        }
-
-        function renderPerfChart() {
-            const ctx = document.getElementById('perfChart').getContext('2d');
-            perfChartInstance = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: [],
-                    datasets: [
-                        {
-                            label: 'Crawl Throughput (Files/sec)',
-                            data: [],
-                            backgroundColor: '#3b82f6',
-                            borderRadius: 4,
-                            barPercentage: 0.6
-                        },
-                        {
-                            label: 'Index Rate (Docs/sec)',
-                            data: [],
-                            backgroundColor: '#14b8a6',
-                            borderRadius: 4,
-                            barPercentage: 0.6
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            grid: { color: '#f1f5f9' },
-                            title: { display: true, text: 'Operations / Sec' }
-                        },
-                        x: {
-                            grid: { display: false },
-                            ticks: { maxRotation: 45, minRotation: 45, font: { size: 10 } }
-                        }
-                    },
-                    plugins: {
-                        tooltip: {
-                            mode: 'index',
-                            intersect: false,
-                            backgroundColor: 'rgba(15, 23, 42, 0.9)',
-                            padding: 12
-                        },
-                        legend: { position: 'top', align: 'end' }
-                    }
-                }
-            });
-            updatePerfChart();
-        }
-
-        function updatePerfChart() {
-            if (!perfChartInstance) return;
-
-            const filtered = currentFilter === 'all' 
-                ? testCases 
-                : testCases.filter(tc => tc.category === currentFilter);
-
-            // Sort by expected index rate for cleaner viz
-            // filtered.sort((a, b) => (b.baselineIndex || 0) - (a.baselineIndex || 0));
-
-            perfChartInstance.data.labels = filtered.map(tc => tc.id);
-            perfChartInstance.data.datasets[0].data = filtered.map(tc => tc.baselineCrawl || 0);
-            perfChartInstance.data.datasets[1].data = filtered.map(tc => tc.baselineIndex || 0);
-            
-            perfChartInstance.update();
-        }
+        // Initialize icons globally once at the very end
+        lucide.createIcons();
 
     </script>
 </body>
